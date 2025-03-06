@@ -1,14 +1,14 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var cache = builder.AddRedis("cache");
+var apiService = builder.AddProject<Projects.ChatService_ApiService>("apiservice")
+	.WithExternalHttpEndpoints();
 
-var apiService = builder.AddProject<Projects.ChatService_ApiService>("apiservice");
-
-builder.AddProject<Projects.ChatService_Web>("webfrontend")
-	.WithExternalHttpEndpoints()
-	.WithReference(cache)
-	.WaitFor(cache)
+builder.AddNpmApp("reactFrontend", "../ChatService.Frontend")
 	.WithReference(apiService)
-	.WaitFor(apiService);
+	.WaitFor(apiService)
+	.WithEnvironment("BROWSER", "none") // Disable opening browser on npm start
+	.WithHttpEndpoint(env: "PORT")
+	.WithExternalHttpEndpoints()
+	.PublishAsDockerFile();
 
 builder.Build().Run();
