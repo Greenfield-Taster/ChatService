@@ -15,10 +15,10 @@ builder.Services.AddCors(opt =>
 {
 	opt.AddPolicy("reactApp", builder =>
 	{
-		builder.WithOrigins("http://localhost:3000")
-		.AllowAnyHeader().
-		AllowAnyMethod().
-		AllowCredentials();
+		builder.WithOrigins("http://localhost:53849")
+			.AllowAnyHeader()
+			.AllowAnyMethod()
+			.AllowCredentials();
 	});
 });
 
