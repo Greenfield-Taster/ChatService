@@ -1,7 +1,14 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
+var postgresServer = builder.AddPostgres("postgresServer")
+	.WithPgAdmin();
+
+var chatDatabase = postgresServer.AddDatabase("ChatDatabase");
+
 var apiService = builder.AddProject<Projects.ChatService_ApiService>("apiservice")
-	.WithExternalHttpEndpoints();
+	.WithExternalHttpEndpoints()
+	.WithReference(chatDatabase)
+	.WaitFor(chatDatabase);
 
 builder.AddNpmApp("ChatFrontend", "../chat-app")
 	.WithReference(apiService)
