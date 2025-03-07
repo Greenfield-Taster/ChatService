@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatService.ServiceDefaults
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatService.ApiService", "ChatService\ChatService.ApiService\ChatService.ApiService.csproj", "{4B4E48ED-A6E0-68EF-EA6A-08FFE847B01A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChatService.Web", "ChatService\ChatService.Web\ChatService.Web.csproj", "{DAA2426A-BF34-4B08-72A0-736168307CF7}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,10 +27,6 @@ Global
 		{4B4E48ED-A6E0-68EF-EA6A-08FFE847B01A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B4E48ED-A6E0-68EF-EA6A-08FFE847B01A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B4E48ED-A6E0-68EF-EA6A-08FFE847B01A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DAA2426A-BF34-4B08-72A0-736168307CF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DAA2426A-BF34-4B08-72A0-736168307CF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DAA2426A-BF34-4B08-72A0-736168307CF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DAA2426A-BF34-4B08-72A0-736168307CF7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

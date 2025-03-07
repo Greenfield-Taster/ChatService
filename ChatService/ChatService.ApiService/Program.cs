@@ -1,4 +1,5 @@
 using ChatService.ApiService.Hubs;
+using ChatService.DataService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,19 @@ builder.Services.AddSignalR();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+
+builder.Services.AddCors(opt =>
+{
+	opt.AddPolicy("reactApp", builder =>
+	{
+		builder.WithOrigins("http://localhost:3000")
+		.AllowAnyHeader().
+		AllowAnyMethod().
+		AllowCredentials();
+	});
+});
+
+builder.Services.AddSingleton<SharedDb>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -22,6 +36,8 @@ if (app.Environment.IsDevelopment())
 {
 	app.MapOpenApi();
 }
+
+app.UseCors("reactApp");
 
 app.MapHub<ChatHub>("/Chat");
 

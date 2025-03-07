@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ChatService.ApiService\ChatService.ApiService.csproj" />
-    <ProjectReference Include="..\ChatService.Web\ChatService.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
