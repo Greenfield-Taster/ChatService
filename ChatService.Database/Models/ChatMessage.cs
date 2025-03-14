@@ -1,21 +1,27 @@
-﻿namespace ChatService.Database.Models;
+﻿using System;
 
-public class ChatMessage
+namespace ChatService.Database.Models
 {
-	public Guid Id { get; set; }
-	public Guid SenderId { get; set; }
-	public Guid RoomId { get; set; }
-	public string Content { get; set; } = string.Empty;
-}
+    public enum MessageStatus
+    {
+        Sent,
+        Delivered,
+        Read
+    }
 
-public class ChatUser
-{
-	public Guid Id { get; set; }
-	public string Name { get; set; } = string.Empty;
-}
+    public class ChatMessage
+    {
+        public string Id { get; set; }
+        public string Message { get; set; }
+        public DateTime Timestamp { get; set; }
+        public MessageStatus Status { get; set; }
 
-public class ChatRoom
-{
-	public Guid Id { get; set; }
-	public string Name { get; set; } = string.Empty;
+        // Foreign keys
+        public string ChatRoomId { get; set; }
+        public string SenderId { get; set; }
+
+        // Navigation properties
+        public ChatRoom ChatRoom { get; set; }
+        public User Sender { get; set; }
+    }
 }

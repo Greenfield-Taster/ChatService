@@ -6,48 +6,50 @@ namespace ChatService.Database.Repositories;
 
 public interface IChatRepository
 {
-	Task<IEnumerable<ChatMessage>> GetMessagesAsync(Guid roomId);
-	Task StoreMessageAsync(ChatMessage message);
-
-	Task<IEnumerable<ChatUser>> GetUsersInRoomAsync(Guid roomId);
-
-	Task CreateRoomAsync(ChatRoom room);
-	Task DeleteRoomAsync(Guid roomId);
+    Task<List<ChatMessage>> GetMessagesByChatRoomIdAsync(string chatRoomId, int limit = 50, int offset = 0);
+    Task<ChatMessage> SaveMessageAsync(ChatMessage message);
+    Task<ChatMessage> UpdateMessageStatusAsync(string messageId, MessageStatus status);
 }
 
-public class ChatRepository(ChatDbContext chatDbContext) : IChatRepository
+public class ChatRepository : IChatRepository
 {
-	public async Task<IEnumerable<ChatMessage>> GetMessagesAsync(Guid roomId)
-	{
-		return await chatDbContext.ChatMessages
-			.Where(message => message.RoomId == roomId)
-			.ToListAsync();
-	}
+    private readonly ChatDbContext _context;
 
-	public async Task StoreMessageAsync(ChatMessage message)
-	{
-		await chatDbContext.ChatMessages.AddAsync(message);
-		await chatDbContext.SaveChangesAsync();
-	}
+    public ChatRepository(ChatDbContext context)
+    {
+        _context = context;
+    }
 
-	public async Task<IEnumerable<ChatUser>> GetUsersInRoomAsync(Guid roomId)
-	{
-		throw new NotImplementedException();
-	}
+    public async Task<List<ChatMessage>> GetMessagesByChatRoomIdAsync(string chatRoomId, int limit = 50, int offset = 0)
+    {
+        return await _context.ChatMessages
+            .Include(m => m.Sender)
+            .Where(m => m.ChatRoomId == chatRoomId)
+            .OrderByDescending(m => m.Timestamp)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync();
+    }
 
-	public async Task CreateRoomAsync(ChatRoom room)
-	{
-		await chatDbContext.ChatRooms.AddAsync(room);
-		await chatDbContext.SaveChangesAsync();
-	}
+    public async Task<ChatMessage> SaveMessageAsync(ChatMessage message)
+    {
+        message.Id = Guid.NewGuid().ToString();
+        message.Timestamp = DateTime.UtcNow;
+        message.Status = MessageStatus.Sent;
 
-	public async Task DeleteRoomAsync(Guid roomId)
-	{
-		var room = await chatDbContext.ChatRooms.FindAsync(roomId);
-		if (room != null)
-		{
-			chatDbContext.ChatRooms.Remove(room);
-			await chatDbContext.SaveChangesAsync();
-		}
-	}
+        _context.ChatMessages.Add(message);
+        await _context.SaveChangesAsync();
+        return message;
+    }
+
+    public async Task<ChatMessage> UpdateMessageStatusAsync(string messageId, MessageStatus status)
+    {
+        var message = await _context.ChatMessages.FindAsync(messageId);
+        if (message != null)
+        {
+            message.Status = status;
+            await _context.SaveChangesAsync();
+        }
+        return message;
+    }
 }
