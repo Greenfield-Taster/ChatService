@@ -1,6 +1,7 @@
 using ChatService.ApiService.Hubs;
 using ChatService.Database;
 using ChatService.Database.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,18 +41,20 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
+// TODO: Move to servicing
+using (var scope = app.Services.CreateScope())
+{
+	var context = scope.ServiceProvider.GetRequiredService<ChatDbContext>();
+	context.Database.Migrate();
+}
+
+// TODO: Move to dev environment
 app.UseSwagger();
 app.UseSwaggerUI();
 
 if (app.Environment.IsDevelopment())
 {
 	app.MapOpenApi();
-
-	using (var scope = app.Services.CreateScope())
-	{
-		var context = scope.ServiceProvider.GetRequiredService<ChatDbContext>();
-		context.Database.EnsureCreated();
-	}
 }
 
 app.UseCors("MyCorsPolicy");
