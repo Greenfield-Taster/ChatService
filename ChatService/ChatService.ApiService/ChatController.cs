@@ -62,25 +62,43 @@ namespace ChatService.ApiService.Controllers
                     var msg = messages.First();
                     var sender = await _userRepository.GetByIdAsync(msg.SenderId);
 
-                    lastMessage = new ChatMessageDto
+                    if (sender != null)
                     {
-                        Id = msg.Id,
-                        Message = msg.Message,
-                        Timestamp = msg.Timestamp,
-                        SenderId = msg.SenderId,
-                        SenderName = sender.Name,
-                        SenderRole = sender.Role,
-                        Status = msg.Status.ToString()
-                    };
+                        lastMessage = new ChatMessageDto
+                        {
+                            Id = msg.Id,
+                            Message = msg.Message,
+                            Timestamp = msg.Timestamp,
+                            SenderId = msg.SenderId,
+                            SenderName = sender.Name,
+                            SenderRole = sender.Role,
+                            Status = msg.Status.ToString()
+                        };
+                    }
+                    else
+                    {
+                        // If sender not found, provide message without sender details
+                        lastMessage = new ChatMessageDto
+                        {
+                            Id = msg.Id,
+                            Message = msg.Message,
+                            Timestamp = msg.Timestamp,
+                            SenderId = msg.SenderId,
+                            SenderName = "Unknown User",
+                            SenderRole = "unknown",
+                            Status = msg.Status.ToString()
+                        };
+                    }
                 }
 
                 // Get admin and user details
                 var admin = await _userRepository.GetByIdAsync(room.AdminId);
                 var regularUser = await _userRepository.GetByIdAsync(room.UserId);
 
+                // Skip rooms with missing users
                 if (admin == null || regularUser == null)
                 {
-                    continue;  // Skip rooms with missing users
+                    continue;
                 }
 
                 chatRoomDtos.Add(new ChatRoomDto
@@ -121,6 +139,15 @@ namespace ChatService.ApiService.Controllers
                 return NotFound("Chat room not found");
             }
 
+            // Get admin and user details
+            var admin = await _userRepository.GetByIdAsync(chatRoom.AdminId);
+            var regularUser = await _userRepository.GetByIdAsync(chatRoom.UserId);
+
+            if (admin == null || regularUser == null)
+            {
+                return NotFound("One or more users associated with this chat room not found");
+            }
+
             return new ChatRoomDto
             {
                 Id = chatRoom.Id,
@@ -128,19 +155,19 @@ namespace ChatService.ApiService.Controllers
                 CreatedAt = chatRoom.CreatedAt,
                 Admin = new UserDto
                 {
-                    Id = chatRoom.Admin.Id,
-                    Email = chatRoom.Admin.Email,
-                    Name = chatRoom.Admin.Name,
-                    Nickname = chatRoom.Admin.Nickname,
-                    Role = chatRoom.Admin.Role
+                    Id = admin.Id,
+                    Email = admin.Email,
+                    Name = admin.Name,
+                    Nickname = admin.Nickname,
+                    Role = admin.Role
                 },
                 User = new UserDto
                 {
-                    Id = chatRoom.RegularUser.Id,
-                    Email = chatRoom.RegularUser.Email,
-                    Name = chatRoom.RegularUser.Name,
-                    Nickname = chatRoom.RegularUser.Nickname,
-                    Role = chatRoom.RegularUser.Role
+                    Id = regularUser.Id,
+                    Email = regularUser.Email,
+                    Name = regularUser.Name,
+                    Nickname = regularUser.Nickname,
+                    Role = regularUser.Role
                 }
             };
         }
@@ -174,9 +201,12 @@ namespace ChatService.ApiService.Controllers
                 return BadRequest("A chat room already exists between these users");
             }
 
+            // Generate room name based on user's nickname
+            string roomName = $"Chat with {user.Nickname}";
+
             var chatRoom = new ChatRoom
             {
-                Name = request.Name,
+                Name = roomName, // Automatically set room name
                 AdminId = request.AdminId,
                 UserId = request.UserId
             };
@@ -226,16 +256,34 @@ namespace ChatService.ApiService.Controllers
             foreach (var message in messages)
             {
                 var sender = await _userRepository.GetByIdAsync(message.SenderId);
-                messageDtos.Add(new ChatMessageDto
+
+                if (sender != null)
                 {
-                    Id = message.Id,
-                    Message = message.Message,
-                    Timestamp = message.Timestamp,
-                    SenderId = message.SenderId,
-                    SenderName = sender.Name,
-                    SenderRole = sender.Role,
-                    Status = message.Status.ToString()
-                });
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = message.Id,
+                        Message = message.Message,
+                        Timestamp = message.Timestamp,
+                        SenderId = message.SenderId,
+                        SenderName = sender.Name,
+                        SenderRole = sender.Role,
+                        Status = message.Status.ToString()
+                    });
+                }
+                else
+                {
+                    // Handle messages from users that no longer exist
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = message.Id,
+                        Message = message.Message,
+                        Timestamp = message.Timestamp,
+                        SenderId = message.SenderId,
+                        SenderName = "Unknown User",
+                        SenderRole = "unknown",
+                        Status = message.Status.ToString()
+                    });
+                }
             }
 
             return messageDtos;
@@ -308,23 +356,42 @@ namespace ChatService.ApiService.Controllers
         [HttpPost("user")]
         public async Task<ActionResult<UserDto>> RegisterOrUpdateUser(UserInfoRequest request)
         {
-            // Create or update the user in the database
-            var user = new User
-            {
-                Id = request.Id,
-                Email = request.Email,
-                Name = request.Name, 
-                Nickname = request.Nickname,
-                Role = request.Role
-            };
+            // Check if user already exists
+            var existingUser = await _userRepository.GetByIdAsync(request.Id);
 
-            await _userRepository.CreateUserAsync(user);
+            User user;
+            if (existingUser != null)
+            {
+                // Update existing user
+                // Update existing user's properties
+                existingUser.Email = request.Email;
+                existingUser.Name = request.Name;
+                existingUser.Nickname = request.Nickname;
+                existingUser.Role = request.Role;
+                user = existingUser;
+
+                // Create the user again to update it (since there's no UpdateUserAsync method)
+                await _userRepository.CreateUserAsync(user);
+            }
+            else
+            {
+                // Create new user
+                user = new User
+                {
+                    Id = request.Id,
+                    Email = request.Email,
+                    Name = request.Name,
+                    Nickname = request.Nickname,
+                    Role = request.Role
+                };
+                await _userRepository.CreateUserAsync(user);
+            }
 
             return new UserDto
             {
                 Id = user.Id,
                 Email = user.Email,
-                Name = user.Name, 
+                Name = user.Name,
                 Nickname = user.Nickname,
                 Role = user.Role
             };
@@ -338,7 +405,7 @@ namespace ChatService.ApiService.Controllers
             {
                 Id = u.Id,
                 Email = u.Email,
-                Name = u.Name, 
+                Name = u.Name,
                 Nickname = u.Nickname,
                 Role = u.Role
             }).ToList();

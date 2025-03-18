@@ -98,16 +98,40 @@ namespace ChatService.ApiService.Hubs
 
             // Get recent messages
             var messages = await _chatRepository.GetMessagesByChatRoomIdAsync(chatRoomId, 50, 0);
-            var messageDtos = messages.Select(m => new ChatMessageDto
+            var messageDtos = new List<ChatMessageDto>();
+
+            foreach (var m in messages)
             {
-                Id = m.Id,
-                Message = m.Message,
-                Timestamp = m.Timestamp,
-                SenderId = m.SenderId,
-                SenderName = m.Sender.Name,
-                SenderRole = m.Sender.Role,
-                Status = m.Status.ToString()
-            }).ToList();
+                var sender = await _userRepository.GetByIdAsync(m.SenderId);
+
+                if (sender != null)
+                {
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = m.Id,
+                        Message = m.Message,
+                        Timestamp = m.Timestamp,
+                        SenderId = m.SenderId,
+                        SenderName = sender.Name,
+                        SenderRole = sender.Role,
+                        Status = m.Status.ToString()
+                    });
+                }
+                else
+                {
+                    // Handle messages from users that no longer exist
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = m.Id,
+                        Message = m.Message,
+                        Timestamp = m.Timestamp,
+                        SenderId = m.SenderId,
+                        SenderName = "Unknown User",
+                        SenderRole = "unknown",
+                        Status = m.Status.ToString()
+                    });
+                }
+            }
 
             await Clients.Caller.SendAsync("ReceiveRecentMessages", messageDtos);
         }
@@ -202,16 +226,40 @@ namespace ChatService.ApiService.Hubs
 
             // Get messages with pagination
             var messages = await _chatRepository.GetMessagesByChatRoomIdAsync(chatRoomId, 50, offset);
-            var messageDtos = messages.Select(m => new ChatMessageDto
+            var messageDtos = new List<ChatMessageDto>();
+
+            foreach (var m in messages)
             {
-                Id = m.Id,
-                Message = m.Message,
-                Timestamp = m.Timestamp,
-                SenderId = m.SenderId,
-                SenderName = m.Sender.Name,
-                SenderRole = m.Sender.Role,
-                Status = m.Status.ToString()
-            }).ToList();
+                var sender = await _userRepository.GetByIdAsync(m.SenderId);
+
+                if (sender != null)
+                {
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = m.Id,
+                        Message = m.Message,
+                        Timestamp = m.Timestamp,
+                        SenderId = m.SenderId,
+                        SenderName = sender.Name,
+                        SenderRole = sender.Role,
+                        Status = m.Status.ToString()
+                    });
+                }
+                else
+                {
+                    // Handle messages from users that no longer exist
+                    messageDtos.Add(new ChatMessageDto
+                    {
+                        Id = m.Id,
+                        Message = m.Message,
+                        Timestamp = m.Timestamp,
+                        SenderId = m.SenderId,
+                        SenderName = "Unknown User",
+                        SenderRole = "unknown",
+                        Status = m.Status.ToString()
+                    });
+                }
+            }
 
             await Clients.Caller.SendAsync("ReceiveMoreMessages", messageDtos);
         }
