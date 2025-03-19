@@ -33,7 +33,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://yourdomain.com") // Добавьте все нужные домены
+        policy.WithOrigins("http://localhost:3000", "https://yourdomain.com") // Add necessary domains
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); 
@@ -68,7 +68,7 @@ if (app.Environment.IsDevelopment())
 //app.UseCors("MyCorsPolicy");
 app.UseCors("AllowSpecificOrigins");
 
-app.MapHub<ChatHub>("/сhatHub");
+app.MapHub<ChatHub>("/chatHub");
 
 app.MapControllers();
 
