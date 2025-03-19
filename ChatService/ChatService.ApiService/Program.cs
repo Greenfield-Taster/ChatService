@@ -33,7 +33,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://yourdomain.com") // Add necessary domains
+        policy.WithOrigins("http://localhost:3000", "https://greenfield-taster.github.io") 
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); 
