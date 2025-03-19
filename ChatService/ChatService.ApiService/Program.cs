@@ -31,12 +31,13 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddCors(options =>
 {
-	options.AddPolicy("AllowAll", policy =>
-	{
-		policy.AllowAnyOrigin()        // Allow requests from any domain
-			  .AllowAnyMethod()        // Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-			  .AllowAnyHeader();       // Allow all headers
-	});
+    options.AddPolicy("AllowSpecificOrigins", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000", "https://yourdomain.com") // Добавьте все нужные домены
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); 
+    });
 });
 
 // Register repositories
@@ -65,9 +66,9 @@ if (app.Environment.IsDevelopment())
 }
 
 //app.UseCors("MyCorsPolicy");
-app.UseCors("AllowAll");
+app.UseCors("AllowSpecificOrigins");
 
-app.MapHub<ChatHub>("/Chat");
+app.MapHub<ChatHub>("/сhatHub");
 
 app.MapControllers();
 
