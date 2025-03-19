@@ -188,12 +188,6 @@ namespace ChatService.ApiService.Controllers
                 return NotFound($"User with ID {request.UserId} not found");
             }
 
-            // Verify that the admin is actually an admin
-            if (admin.Role != "admin")
-            {
-                return BadRequest("Only admins can create chat rooms as admins");
-            }
-
             // Check if a chat room already exists between these users
             var chatRoomExists = await _chatRoomRepository.ChatRoomExistsAsync(request.AdminId, request.UserId);
             if (chatRoomExists)
