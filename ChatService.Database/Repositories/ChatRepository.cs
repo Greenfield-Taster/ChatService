@@ -1,55 +1,104 @@
-﻿using ChatService.Database;
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using ChatService.Database.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace ChatService.Database.Repositories;
-
-public interface IChatRepository
+namespace ChatService.Database.Repositories
 {
-    Task<List<ChatMessage>> GetMessagesByChatRoomIdAsync(string chatRoomId, int limit = 50, int offset = 0);
-    Task<ChatMessage> SaveMessageAsync(ChatMessage message);
-    Task<ChatMessage> UpdateMessageStatusAsync(string messageId, MessageStatus status);
-}
-
-public class ChatRepository : IChatRepository
-{
-    private readonly ChatDbContext _context;
-
-    public ChatRepository(ChatDbContext context)
+    public interface IChatRepository
     {
-        _context = context;
+        Task<List<ChatMessage>> GetAllMessagesAsync();
+        Task<ChatMessage?> GetMessageByIdAsync(string id);
+        Task<List<ChatMessage>> GetMessagesByRoomIdAsync(string roomId);
+        Task<List<ChatMessage>> GetPaginatedMessagesByRoomIdAsync(string roomId, int pageNumber, int pageSize);
+        Task<List<ChatMessage>> GetUnreadMessagesAsync(string roomId, string userId);
+        Task<ChatMessage> AddMessageAsync(ChatMessage message);
+        Task<ChatMessage> UpdateMessageAsync(ChatMessage message);
+        Task DeleteMessageAsync(string id);
     }
 
-    public async Task<List<ChatMessage>> GetMessagesByChatRoomIdAsync(string chatRoomId, int limit = 50, int offset = 0)
+    public class ChatRepository : IChatRepository
     {
-        return await _context.ChatMessages
-            .Include(m => m.Sender)
-            .Where(m => m.ChatRoomId == chatRoomId)
-            .OrderByDescending(m => m.Timestamp)
-            .Skip(offset)
-            .Take(limit)
-            .ToListAsync();
-    }
+        private readonly ChatDbContext _context;
 
-    public async Task<ChatMessage> SaveMessageAsync(ChatMessage message)
-    {
-        message.Id = Guid.NewGuid().ToString();
-        message.Timestamp = DateTime.UtcNow;
-        message.Status = MessageStatus.Sent;
-
-        _context.ChatMessages.Add(message);
-        await _context.SaveChangesAsync();
-        return message;
-    }
-
-    public async Task<ChatMessage> UpdateMessageStatusAsync(string messageId, MessageStatus status)
-    {
-        var message = await _context.ChatMessages.FindAsync(messageId);
-        if (message != null)
+        public ChatRepository(ChatDbContext context)
         {
-            message.Status = status;
-            await _context.SaveChangesAsync();
+            _context = context;
         }
-        return message;
+
+        public async Task<List<ChatMessage>> GetAllMessagesAsync()
+        {
+            return await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Include(m => m.ChatRoom)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<ChatMessage?> GetMessageByIdAsync(string id)
+        {
+            return await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Include(m => m.ChatRoom)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == id);
+        }
+
+        public async Task<List<ChatMessage>> GetMessagesByRoomIdAsync(string roomId)
+        {
+            return await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Where(m => m.ChatRoomId == roomId)
+                .OrderBy(m => m.Timestamp)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<List<ChatMessage>> GetPaginatedMessagesByRoomIdAsync(string roomId, int pageNumber, int pageSize)
+        {
+            return await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Where(m => m.ChatRoomId == roomId)
+                .OrderByDescending(m => m.Timestamp)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<List<ChatMessage>> GetUnreadMessagesAsync(string roomId, string userId)
+        {
+            return await _context.ChatMessages
+                .Include(m => m.Sender)
+                .Where(m => m.ChatRoomId == roomId &&
+                            m.SenderId != userId &&
+                            m.Status != MessageStatus.Read)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<ChatMessage> AddMessageAsync(ChatMessage message)
+        {
+            _context.ChatMessages.Add(message);
+            await _context.SaveChangesAsync();
+            return message;
+        }
+
+        public async Task<ChatMessage> UpdateMessageAsync(ChatMessage message)
+        {
+            _context.Entry(message).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return message;
+        }
+
+        public async Task DeleteMessageAsync(string id)
+        {
+            var message = await _context.ChatMessages.FindAsync(id);
+            if (message != null)
+            {
+                _context.ChatMessages.Remove(message);
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

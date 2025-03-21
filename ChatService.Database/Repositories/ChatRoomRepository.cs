@@ -1,20 +1,19 @@
-﻿using ChatService.Database.Models;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using ChatService.Database.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChatService.Database.Repositories
 {
     public interface IChatRoomRepository
     {
-        Task<ChatRoom> GetByIdAsync(string id);
-        Task<List<ChatRoom>> GetByAdminIdAsync(string adminId);
-        Task<List<ChatRoom>> GetByUserIdAsync(string userId);
-        Task<ChatRoom> CreateChatRoomAsync(ChatRoom chatRoom);
-        Task<bool> ChatRoomExistsAsync(string adminId, string userId);
+        Task<List<ChatRoom>> GetAllRoomsAsync();
+        Task<ChatRoom?> GetRoomByIdAsync(string id);
+        Task<List<ChatRoom>> GetRoomsByUserIdAsync(string userId);
+        Task<List<ChatRoom>> GetRoomsByAdminIdAsync(string adminId);
+        Task<ChatRoom> AddRoomAsync(ChatRoom room);
+        Task<ChatRoom> UpdateRoomAsync(ChatRoom room);
+        Task DeleteRoomAsync(string id);
     }
 
     public class ChatRoomRepository : IChatRoomRepository
@@ -26,45 +25,76 @@ namespace ChatService.Database.Repositories
             _context = context;
         }
 
-        public async Task<ChatRoom> GetByIdAsync(string id)
+        public async Task<List<ChatRoom>> GetAllRoomsAsync()
         {
             return await _context.ChatRooms
                 .Include(r => r.Admin)
                 .Include(r => r.RegularUser)
+                .Include(r => r.Messages)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<ChatRoom?> GetRoomByIdAsync(string id)
+        {
+            return await _context.ChatRooms
+                .Include(r => r.Admin)
+                .Include(r => r.RegularUser)
+                .Include(r => r.Messages)
+                    .ThenInclude(m => m.Sender)
+                .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == id);
         }
 
-        public async Task<List<ChatRoom>> GetByAdminIdAsync(string adminId)
-        {
-            return await _context.ChatRooms
-                .Include(r => r.RegularUser)
-                .Where(r => r.AdminId == adminId)
-                .ToListAsync();
-        }
-
-        public async Task<List<ChatRoom>> GetByUserIdAsync(string userId)
+        public async Task<List<ChatRoom>> GetRoomsByUserIdAsync(string userId)
         {
             return await _context.ChatRooms
                 .Include(r => r.Admin)
+                .Include(r => r.RegularUser)
+                .Include(r => r.Messages)
                 .Where(r => r.UserId == userId)
+                .AsNoTracking()
                 .ToListAsync();
         }
 
-        public async Task<ChatRoom> CreateChatRoomAsync(ChatRoom chatRoom)
-        {
-            chatRoom.Id = Guid.NewGuid().ToString();
-            chatRoom.CreatedAt = DateTime.UtcNow;
-
-            _context.ChatRooms.Add(chatRoom);
-            await _context.SaveChangesAsync();
-            return chatRoom;
-        }
-
-        public async Task<bool> ChatRoomExistsAsync(string adminId, string userId)
+        public async Task<List<ChatRoom>> GetRoomsByAdminIdAsync(string adminId)
         {
             return await _context.ChatRooms
-                .AnyAsync(r => r.AdminId == adminId && r.UserId == userId);
+                .Include(r => r.Admin)
+                .Include(r => r.RegularUser)
+                .Include(r => r.Messages)
+                .Where(r => r.AdminId == adminId)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<ChatRoom> AddRoomAsync(ChatRoom room)
+        {
+            _context.ChatRooms.Add(room);
+            await _context.SaveChangesAsync();
+            return room;
+        }
+
+        public async Task<ChatRoom> UpdateRoomAsync(ChatRoom room)
+        {
+            _context.Entry(room).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            return room;
+        }
+
+        public async Task DeleteRoomAsync(string id)
+        {
+            var room = await _context.ChatRooms.FindAsync(id);
+            if (room != null)
+            {
+                var messages = await _context.ChatMessages
+                    .Where(m => m.ChatRoomId == id)
+                    .ToListAsync();
+
+                _context.ChatMessages.RemoveRange(messages);
+                _context.ChatRooms.Remove(room);
+                await _context.SaveChangesAsync();
+            }
         }
     }
-
 }

@@ -1,7 +1,7 @@
 ﻿using ChatService.ApiService.Models;
 using System.Collections.Concurrent;
 
-namespace ChatService.DataService
+namespace ChatService.ApiService.DataService
 {
     public class SharedDb
     {

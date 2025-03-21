@@ -10,46 +10,54 @@ public class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbContext(
 	public DbSet<ChatRoom> ChatRooms => Set<ChatRoom>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        // Configure User
-        modelBuilder.Entity<User>()
-            .HasKey(u => u.Id);
+    {          
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).IsRequired();
+            entity.Property(e => e.Name).IsRequired();
+            entity.Property(e => e.Role).IsRequired();
+ 
+            entity.HasIndex(e => e.Email).IsUnique();
+        });
+         
+        modelBuilder.Entity<ChatRoom>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+             
+            entity.HasOne(e => e.Admin)
+                  .WithMany()
+                  .HasForeignKey(e => e.AdminId)
+                  .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<User>()
-            .Property(u => u.Email)
-            .IsRequired();
+            entity.HasOne(e => e.RegularUser)
+                  .WithMany(u => u.ChatRooms)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+         
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Message).IsRequired();
+            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.Status).IsRequired();
+             
+            entity.HasOne(e => e.ChatRoom)
+                  .WithMany(r => r.Messages)
+                  .HasForeignKey(e => e.ChatRoomId)
+                  .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.Email)
-            .IsUnique();
-
-        // Configure ChatRoom
-        modelBuilder.Entity<ChatRoom>()
-            .HasKey(r => r.Id);
-
-        modelBuilder.Entity<ChatRoom>()
-            .HasOne(r => r.Admin)
-            .WithMany()
-            .HasForeignKey(r => r.AdminId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<ChatRoom>()
-            .HasOne(r => r.RegularUser)
-            .WithMany(u => u.ChatRooms)
-            .HasForeignKey(r => r.UserId);
-
-        // Configure ChatMessage
-        modelBuilder.Entity<ChatMessage>()
-            .HasKey(m => m.Id);
-
-        modelBuilder.Entity<ChatMessage>()
-            .HasOne(m => m.ChatRoom)
-            .WithMany(r => r.Messages)
-            .HasForeignKey(m => m.ChatRoomId);
-
-        modelBuilder.Entity<ChatMessage>()
-            .HasOne(m => m.Sender)
-            .WithMany(u => u.Messages)
-            .HasForeignKey(m => m.SenderId);
+            entity.HasOne(e => e.Sender)
+                  .WithMany(u => u.Messages)
+                  .HasForeignKey(e => e.SenderId)
+                  .OnDelete(DeleteBehavior.Restrict);
+             
+            entity.HasIndex(e => e.ChatRoomId);
+             
+            entity.HasIndex(e => e.Timestamp);
+        });
     }
 }

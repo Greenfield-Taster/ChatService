@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 
 namespace ChatService.Database.Models
 {
@@ -14,14 +15,14 @@ namespace ChatService.Database.Models
         public string Id { get; set; }
         public string Message { get; set; }
         public DateTime Timestamp { get; set; }
-        public MessageStatus Status { get; set; }
-
-        // Foreign keys
+        public MessageStatus Status { get; set; } 
         public string ChatRoomId { get; set; }
         public string SenderId { get; set; }
-
-        // Navigation properties
+         
+        [JsonIgnore]
         public ChatRoom ChatRoom { get; set; }
+
+        [JsonIgnore]
         public User Sender { get; set; }
     }
 }
