@@ -23,30 +23,38 @@ namespace ChatService.ApiService.Controllers
             _chatRoomRepository = chatRoomRepository;
             _userRepository = userRepository;
         }
-
-        // Получение всех чат-комнат
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ChatRoomDto>>> GetChatRooms()
         {
             var rooms = await _chatRoomRepository.GetAllRoomsAsync();
-
             var roomDtos = rooms.Select(r => new ChatRoomDto
             {
                 Id = r.Id,
                 Name = r.Name,
                 CreatedAt = r.CreatedAt,
-                AdminId = r.AdminId,
-                AdminName = r.Admin?.Name,
-                UserId = r.UserId,
-                UserName = r.RegularUser?.Name,
+                Admin = new UserDto
+                {
+                    Id = r.AdminId,
+                    Email = r.Admin?.Email,
+                    Name = r.Admin?.Name,
+                    Nickname = r.Admin?.Nickname,
+                    Role = r.Admin?.Role
+                },
+                User = new UserDto
+                {
+                    Id = r.UserId,
+                    Email = r.RegularUser?.Email,
+                    Name = r.RegularUser?.Name,
+                    Nickname = r.RegularUser?.Nickname,
+                    Role = r.RegularUser?.Role
+                },
                 LastMessageTimestamp = r.Messages.OrderByDescending(m => m.Timestamp)
                                        .FirstOrDefault()?.Timestamp ?? r.CreatedAt,
                 UnreadCount = r.Messages.Count(m => m.Status != MessageStatus.Read)
             }).ToList();
-
             return Ok(roomDtos);
         }
-         
+
         [HttpGet("user/{userId}")]
         public async Task<ActionResult<IEnumerable<ChatRoomDto>>> GetUserChatRooms(string userId)
         {
@@ -55,58 +63,76 @@ namespace ChatService.ApiService.Controllers
             {
                 return NotFound("User not found");
             }
-
             var rooms = await _chatRoomRepository.GetRoomsByUserIdAsync(userId);
-             
+
             if (user.Role == "admin")
             {
                 rooms = await _chatRoomRepository.GetAllRoomsAsync();
             }
-
             var roomDtos = rooms.Select(r => new ChatRoomDto
             {
                 Id = r.Id,
                 Name = r.Name,
                 CreatedAt = r.CreatedAt,
-                AdminId = r.AdminId,
-                AdminName = r.Admin?.Name,
-                UserId = r.UserId,
-                UserName = r.RegularUser?.Name,
+                Admin = new UserDto
+                {
+                    Id = r.AdminId,
+                    Email = r.Admin?.Email,
+                    Name = r.Admin?.Name,
+                    Nickname = r.Admin?.Nickname,
+                    Role = r.Admin?.Role
+                },
+                User = new UserDto
+                {
+                    Id = r.UserId,
+                    Email = r.RegularUser?.Email,
+                    Name = r.RegularUser?.Name,
+                    Nickname = r.RegularUser?.Nickname,
+                    Role = r.RegularUser?.Role
+                },
                 LastMessageTimestamp = r.Messages.OrderByDescending(m => m.Timestamp)
                                       .FirstOrDefault()?.Timestamp ?? r.CreatedAt,
                 UnreadCount = r.Messages.Count(m => m.Status != MessageStatus.Read && m.SenderId != userId)
             }).ToList();
-
             return Ok(roomDtos);
         }
-         
+
         [HttpGet("{id}")]
         public async Task<ActionResult<ChatRoomDto>> GetChatRoom(string id)
         {
             var room = await _chatRoomRepository.GetRoomByIdAsync(id);
-
             if (room == null)
             {
                 return NotFound();
             }
-
             var roomDto = new ChatRoomDto
             {
                 Id = room.Id,
                 Name = room.Name,
                 CreatedAt = room.CreatedAt,
-                AdminId = room.AdminId,
-                AdminName = room.Admin?.Name ,
-                UserId = room.UserId,
-                UserName = room.RegularUser?.Name ,
+                Admin = new UserDto
+                {
+                    Id = room.AdminId,
+                    Email = room.Admin?.Email,
+                    Name = room.Admin?.Name,
+                    Nickname = room.Admin?.Nickname,
+                    Role = room.Admin?.Role
+                },
+                User = new UserDto
+                {
+                    Id = room.UserId,
+                    Email = room.RegularUser?.Email,
+                    Name = room.RegularUser?.Name,
+                    Nickname = room.RegularUser?.Nickname,
+                    Role = room.RegularUser?.Role
+                },
                 LastMessageTimestamp = room.Messages.OrderByDescending(m => m.Timestamp)
                                        .FirstOrDefault()?.Timestamp ?? room.CreatedAt,
                 UnreadCount = room.Messages.Count(m => m.Status != MessageStatus.Read)
             };
-
             return Ok(roomDto);
         }
-         
+
         [HttpPost]
         public async Task<ActionResult<ChatRoom>> CreateChatRoom(CreateChatRoomDto createRoomDto)
         { 
