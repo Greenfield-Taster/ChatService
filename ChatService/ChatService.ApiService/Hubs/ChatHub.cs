@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using ChatService.ApiService.Models;  
+using ChatService.ApiService.Models;
 
 namespace ChatService.ApiService.Hubs
 {
@@ -14,7 +14,7 @@ namespace ChatService.ApiService.Hubs
         private readonly IChatRepository _chatRepository;
         private readonly IChatRoomRepository _chatRoomRepository;
         private readonly IUserRepository _userRepository;
-         
+
         private static Dictionary<string, string> _connectionToUser = new Dictionary<string, string>();
 
         public ChatHub(
@@ -26,32 +26,32 @@ namespace ChatService.ApiService.Hubs
             _chatRoomRepository = chatRoomRepository;
             _userRepository = userRepository;
         }
-         
+
         public async Task ConnectUser(string userId)
         {
             try
-            { 
+            {
                 var user = await _userRepository.GetUserByIdAsync(userId);
                 if (user == null)
                 {
                     throw new Exception("User not found");
                 }
-                 
+
                 _connectionToUser[Context.ConnectionId] = userId;
-                 
+
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
-                 
+
                 if (user.Role == "admin")
                 {
                     await Groups.AddToGroupAsync(Context.ConnectionId, "admins");
                 }
-                 
+
                 var rooms = await _chatRoomRepository.GetRoomsByUserIdAsync(userId);
                 foreach (var room in rooms)
                 {
                     await Groups.AddToGroupAsync(Context.ConnectionId, $"room_{room.Id}");
                 }
-                 
+
                 var userDto = new UserDto
                 {
                     Id = user.Id,
@@ -62,7 +62,7 @@ namespace ChatService.ApiService.Hubs
                 };
 
                 await Clients.Group("admins").SendAsync("UserOnline", userDto);
-                 
+
                 if (user.Role == "admin")
                 {
                     var allRooms = await _chatRoomRepository.GetAllRoomsAsync();
@@ -93,7 +93,7 @@ namespace ChatService.ApiService.Hubs
                         UnreadCount = r.Messages.Count(m => m.Status != MessageStatus.Read)
                     }).ToList();
 
-                    await Clients.Caller.SendAsync("ReceiveAllRooms", roomDtos);
+                    await Clients.Caller.SendAsync("ReceiveAllChats", roomDtos);
                 }
             }
             catch (Exception ex)
@@ -101,7 +101,7 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         public async Task SendMessage(string roomId, string message)
         {
             try
@@ -116,13 +116,13 @@ namespace ChatService.ApiService.Hubs
                 {
                     throw new Exception("Chat room not found");
                 }
-                 
+
                 var sender = await _userRepository.GetUserByIdAsync(senderId);
                 if (sender.Role != "admin" && room.UserId != senderId)
                 {
                     throw new Exception("Not authorized to send messages to this room");
                 }
-                 
+
                 var chatMessage = new ChatMessage
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -134,7 +134,7 @@ namespace ChatService.ApiService.Hubs
                 };
 
                 await _chatRepository.AddMessageAsync(chatMessage);
-                 
+
                 var senderDto = new UserDto
                 {
                     Id = sender.Id,
@@ -151,15 +151,46 @@ namespace ChatService.ApiService.Hubs
                     Timestamp = chatMessage.Timestamp,
                     Status = chatMessage.Status.ToString(),
                     RoomId = chatMessage.ChatRoomId,
+                    SenderId = senderId,
                     Sender = senderDto
                 });
+                 
+                var updatedRoom = await _chatRoomRepository.GetRoomByIdAsync(roomId);
+                 
+                var roomDto = new ChatRoomDto
+                {
+                    Id = updatedRoom.Id,
+                    Name = updatedRoom.Name,
+                    CreatedAt = updatedRoom.CreatedAt,
+                    Admin = updatedRoom.Admin != null ? new UserDto
+                    {
+                        Id = updatedRoom.AdminId,
+                        Email = updatedRoom.Admin.Email,
+                        Name = updatedRoom.Admin.Name,
+                        Nickname = updatedRoom.Admin.Nickname,
+                        Role = updatedRoom.Admin.Role
+                    } : null,
+                    User = updatedRoom.RegularUser != null ? new UserDto
+                    {
+                        Id = updatedRoom.UserId,
+                        Email = updatedRoom.RegularUser.Email,
+                        Name = updatedRoom.RegularUser.Name,
+                        Nickname = updatedRoom.RegularUser.Nickname,
+                        Role = updatedRoom.RegularUser.Role
+                    } : null, 
+                    LastMessageTimestamp = chatMessage.Timestamp, 
+                    UnreadCount = updatedRoom.Messages.Count(m =>
+                        m.Status != MessageStatus.Read && m.SenderId != senderId)
+                };
+                 
+                await Clients.Group("admins").SendAsync("ChatUpdated", roomDto);
             }
             catch (Exception ex)
             {
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         public async Task CreateRoom(string userId)
         {
             try
@@ -168,27 +199,27 @@ namespace ChatService.ApiService.Hubs
                 {
                     throw new Exception("User not authenticated");
                 }
-                 
+
                 var currentUser = await _userRepository.GetUserByIdAsync(currentUserId);
                 if (currentUser.Role != "admin" && currentUserId != userId)
                 {
                     throw new Exception("Not authorized to create room for another user");
                 }
-                 
+
                 var user = await _userRepository.GetUserByIdAsync(userId);
                 if (user == null)
                 {
                     throw new Exception("User not found");
                 }
-                 
+
                 var existingRoom = await _chatRoomRepository.GetRoomsByUserIdAsync(userId);
                 if (existingRoom.Any())
-                { 
+                {
                     var existingRoomId = existingRoom.First().Id;
                     await Clients.Caller.SendAsync("RoomCreated", existingRoomId);
                     return;
                 }
-                 
+
                 string adminId;
                 User adminUser;
 
@@ -207,7 +238,7 @@ namespace ChatService.ApiService.Hubs
                     adminUser = admins.First();
                     adminId = adminUser.Id;
                 }
-                 
+
                 var roomId = Guid.NewGuid().ToString();
                 var room = new ChatRoom
                 {
@@ -220,9 +251,9 @@ namespace ChatService.ApiService.Hubs
                 };
 
                 await _chatRoomRepository.AddRoomAsync(room);
-                 
+
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"room_{roomId}");
-                 
+
                 var userDto = new UserDto
                 {
                     Id = user.Id,
@@ -240,7 +271,7 @@ namespace ChatService.ApiService.Hubs
                     Nickname = adminUser.Nickname,
                     Role = adminUser.Role
                 };
-                 
+
                 var roomDto = new ChatRoomDto
                 {
                     Id = room.Id,
@@ -251,9 +282,9 @@ namespace ChatService.ApiService.Hubs
                     LastMessageTimestamp = room.CreatedAt,
                     UnreadCount = 0
                 };
-                 
+
                 await Clients.Group("admins").SendAsync("NewRoomCreated", roomDto);
-                 
+
                 await Clients.Caller.SendAsync("RoomCreated", roomId);
             }
             catch (Exception ex)
@@ -261,7 +292,7 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         public async Task JoinRoom(string roomId)
         {
             try
@@ -276,17 +307,17 @@ namespace ChatService.ApiService.Hubs
                 {
                     throw new Exception("Chat room not found");
                 }
-                 
+
                 var user = await _userRepository.GetUserByIdAsync(userId);
                 if (user.Role != "admin" && room.UserId != userId)
                 {
                     throw new Exception("Not authorized to join this room");
                 }
-                 
+
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"room_{roomId}");
-                 
+
                 var messages = await _chatRepository.GetMessagesByRoomIdAsync(roomId);
-                 
+
                 var messageList = messages.Select(m => new
                 {
                     Id = m.Id,
@@ -294,6 +325,7 @@ namespace ChatService.ApiService.Hubs
                     Timestamp = m.Timestamp,
                     Status = m.Status.ToString(),
                     RoomId = m.ChatRoomId,
+                    SenderId = m.SenderId,
                     Sender = new UserDto
                     {
                         Id = m.SenderId,
@@ -303,9 +335,9 @@ namespace ChatService.ApiService.Hubs
                         Role = m.Sender.Role
                     }
                 }).ToList();
-                 
+
                 await Clients.Caller.SendAsync("ReceiveMessageHistory", roomId, messageList);
-                 
+
                 await UpdateMessagesStatusAsync(roomId, userId);
             }
             catch (Exception ex)
@@ -313,12 +345,12 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         public async Task LeaveRoom(string roomId)
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"room_{roomId}");
         }
-         
+
         public async Task GetAllChats()
         {
             try
@@ -335,7 +367,7 @@ namespace ChatService.ApiService.Hubs
                 }
 
                 var rooms = await _chatRoomRepository.GetAllRoomsAsync();
-                 
+
                 var roomsList = rooms.Select(r => new ChatRoomDto
                 {
                     Id = r.Id,
@@ -369,14 +401,14 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         private async Task UpdateMessagesStatusAsync(string roomId, string userId)
         {
             try
             {
                 var user = await _userRepository.GetUserByIdAsync(userId);
                 var messages = await _chatRepository.GetMessagesByRoomIdAsync(roomId);
-                 
+
                 var messagesToUpdate = messages.Where(m => m.SenderId != userId && m.Status != MessageStatus.Read).ToList();
 
                 foreach (var message in messagesToUpdate)
@@ -384,13 +416,42 @@ namespace ChatService.ApiService.Hubs
                     message.Status = MessageStatus.Read;
                     await _chatRepository.UpdateMessageAsync(message);
                 }
-                 
+
                 if (messagesToUpdate.Any())
                 {
                     await Clients.Group($"room_{roomId}").SendAsync("MessagesRead",
                         roomId,
                         messagesToUpdate.Select(m => m.Id).ToList(),
                         userId);
+                     
+                    var updatedRoom = await _chatRoomRepository.GetRoomByIdAsync(roomId);
+                    var roomDto = new ChatRoomDto
+                    {
+                        Id = updatedRoom.Id,
+                        Name = updatedRoom.Name,
+                        CreatedAt = updatedRoom.CreatedAt,
+                        Admin = updatedRoom.Admin != null ? new UserDto
+                        {
+                            Id = updatedRoom.AdminId,
+                            Email = updatedRoom.Admin.Email,
+                            Name = updatedRoom.Admin.Name,
+                            Nickname = updatedRoom.Admin.Nickname,
+                            Role = updatedRoom.Admin.Role
+                        } : null,
+                        User = updatedRoom.RegularUser != null ? new UserDto
+                        {
+                            Id = updatedRoom.UserId,
+                            Email = updatedRoom.RegularUser.Email,
+                            Name = updatedRoom.RegularUser.Name,
+                            Nickname = updatedRoom.RegularUser.Nickname,
+                            Role = updatedRoom.RegularUser.Role
+                        } : null,
+                        LastMessageTimestamp = updatedRoom.Messages.OrderByDescending(m => m.Timestamp)
+                                               .FirstOrDefault()?.Timestamp ?? updatedRoom.CreatedAt,
+                        UnreadCount = 0  
+                    }; 
+
+                    await Clients.Group("admins").SendAsync("ChatUpdated", roomDto);
                 }
             }
             catch (Exception ex)
@@ -398,7 +459,7 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
-         
+
         public async Task SendTypingStatus(string roomId, bool isTyping)
         {
             try
@@ -409,7 +470,7 @@ namespace ChatService.ApiService.Hubs
                 }
 
                 var user = await _userRepository.GetUserByIdAsync(userId);
-                 
+
                 var userDto = new UserDto
                 {
                     Id = user.Id,
@@ -425,13 +486,14 @@ namespace ChatService.ApiService.Hubs
             {
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
-        } 
+        }
+
         public override async Task OnDisconnectedAsync(Exception exception)
         {
             if (_connectionToUser.TryGetValue(Context.ConnectionId, out var userId))
             {
                 var user = await _userRepository.GetUserByIdAsync(userId);
-                 
+
                 if (user != null)
                 {
                     var userDto = new UserDto
@@ -445,7 +507,7 @@ namespace ChatService.ApiService.Hubs
 
                     await Clients.Group("admins").SendAsync("UserOffline", userDto);
                 }
-                 
+
                 _connectionToUser.Remove(Context.ConnectionId);
             }
 
