@@ -102,6 +102,17 @@ namespace ChatService.ApiService.Hubs
             }
         }
 
+        private int CalcUnreadCount(ChatRoom room, string currentUserId)
+        {
+            if (room == null || room.Messages == null)
+                return 0;
+
+            return room.Messages.Count(m =>
+                m.SenderId != currentUserId &&
+                m.Status != MessageStatus.Read);
+        }
+
+
         public async Task SendMessage(string roomId, string message)
         {
             try
@@ -143,7 +154,7 @@ namespace ChatService.ApiService.Hubs
                     Nickname = sender.Nickname,
                     Role = sender.Role
                 };
-                 
+
                 await Clients.Group($"room_{roomId}").SendAsync("ReceiveMessage", new
                 {
                     Id = chatMessage.Id,
@@ -154,9 +165,9 @@ namespace ChatService.ApiService.Hubs
                     SenderId = senderId,
                     Sender = senderDto
                 });
-                 
+
                 var updatedRoom = await _chatRoomRepository.GetRoomByIdAsync(roomId);
-                 
+
                 var roomDto = new ChatRoomDto
                 {
                     Id = updatedRoom.Id,
@@ -177,12 +188,11 @@ namespace ChatService.ApiService.Hubs
                         Name = updatedRoom.RegularUser.Name,
                         Nickname = updatedRoom.RegularUser.Nickname,
                         Role = updatedRoom.RegularUser.Role
-                    } : null, 
+                    } : null,
                     LastMessageTimestamp = chatMessage.Timestamp, 
-                    UnreadCount = updatedRoom.Messages.Count(m =>
-                        m.Status != MessageStatus.Read && m.SenderId != senderId)
+                    UnreadCount = CalcUnreadCount(updatedRoom, senderId)
                 };
-                 
+
                 await Clients.Group("admins").SendAsync("ChatUpdated", roomDto);
             }
             catch (Exception ex)
@@ -190,6 +200,7 @@ namespace ChatService.ApiService.Hubs
                 await Clients.Caller.SendAsync("Error", ex.Message);
             }
         }
+
 
         public async Task CreateRoom(string userId)
         {
@@ -418,14 +429,15 @@ namespace ChatService.ApiService.Hubs
                 }
 
                 if (messagesToUpdate.Any())
-                {
+                { 
                     await Clients.Group($"room_{roomId}").SendAsync("MessagesRead",
                         roomId,
                         messagesToUpdate.Select(m => m.Id).ToList(),
                         userId);
-                     
+
                     var updatedRoom = await _chatRoomRepository.GetRoomByIdAsync(roomId);
-                    var roomDto = new ChatRoomDto
+                     
+                    var roomDtoForReader = new ChatRoomDto
                     {
                         Id = updatedRoom.Id,
                         Name = updatedRoom.Name,
@@ -448,10 +460,48 @@ namespace ChatService.ApiService.Hubs
                         } : null,
                         LastMessageTimestamp = updatedRoom.Messages.OrderByDescending(m => m.Timestamp)
                                                .FirstOrDefault()?.Timestamp ?? updatedRoom.CreatedAt,
-                        UnreadCount = 0  
-                    }; 
+                        UnreadCount = 0   
+                    };
+                     
+                    await Clients.User(userId).SendAsync("ChatUpdated", roomDtoForReader);
+                     
+                    if (user.Role != "admin")
+                    { 
+                        var adminId = updatedRoom.AdminId;
 
-                    await Clients.Group("admins").SendAsync("ChatUpdated", roomDto);
+                        if (adminId != userId)  
+                        { 
+                            var roomDtoForAdmin = new ChatRoomDto
+                            {
+                                Id = updatedRoom.Id,
+                                Name = updatedRoom.Name,
+                                CreatedAt = updatedRoom.CreatedAt,
+                                Admin = updatedRoom.Admin != null ? new UserDto
+                                {
+                                    Id = updatedRoom.AdminId,
+                                    Email = updatedRoom.Admin.Email,
+                                    Name = updatedRoom.Admin.Name,
+                                    Nickname = updatedRoom.Admin.Nickname,
+                                    Role = updatedRoom.Admin.Role
+                                } : null,
+                                User = updatedRoom.RegularUser != null ? new UserDto
+                                {
+                                    Id = updatedRoom.UserId,
+                                    Email = updatedRoom.RegularUser.Email,
+                                    Name = updatedRoom.RegularUser.Name,
+                                    Nickname = updatedRoom.RegularUser.Nickname,
+                                    Role = updatedRoom.RegularUser.Role
+                                } : null,
+                                LastMessageTimestamp = updatedRoom.Messages.OrderByDescending(m => m.Timestamp)
+                                                      .FirstOrDefault()?.Timestamp ?? updatedRoom.CreatedAt, 
+                                UnreadCount = updatedRoom.Messages.Count(m =>
+                                    m.SenderId != adminId &&
+                                    m.Status != MessageStatus.Read)
+                            };
+                             
+                            await Clients.User(adminId).SendAsync("ChatUpdated", roomDtoForAdmin);
+                        }
+                    } 
                 }
             }
             catch (Exception ex)
