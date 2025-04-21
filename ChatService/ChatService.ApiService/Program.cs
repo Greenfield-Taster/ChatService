@@ -20,7 +20,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "https://greenfield-taster.github.io", "https://thankful-hill-05a2fba03.6.azurestaticapps.net") 
+        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "https://greenfield-taster.github.io", "https://wonderful-island-0956e1103.6.azurestaticapps.net") 
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); 
